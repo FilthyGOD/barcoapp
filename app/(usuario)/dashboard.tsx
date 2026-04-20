@@ -10,6 +10,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,10 +36,33 @@ import { FontSize, FontWeight } from '@/src/core/theme/typography';
 import { BorderRadius, Spacing } from '@/src/core/theme/spacing';
 
 export default function UsuarioDashboard() {
-  const { state } = useAppStore();
-  const router    = useRouter();
+  const { state, dispatch, registrarBitacora } = useAppStore();
+  const router = useRouter();
 
-  const deHoy    = useMemo(() => reservacionesDeHoy(state.reservaciones), [state.reservaciones]);
+  const handleLogout = () => {
+    const performLogout = () => {
+      registrarBitacora('LOGOUT', `Cierre de sesión — ${state.user?.name ?? 'Usuario'}`);
+      dispatch({ type: 'LOGOUT' });
+      setTimeout(() => router.replace('/login'), 100);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
+        performLogout();
+      }
+    } else {
+      Alert.alert(
+        'Cerrar Sesión',
+        '¿Estás seguro de que deseas cerrar sesión?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Cerrar Sesión', style: 'destructive', onPress: performLogout },
+        ]
+      );
+    }
+  };
+
+  const deHoy = useMemo(() => reservacionesDeHoy(state.reservaciones), [state.reservaciones]);
   const ingresos = useMemo(() => ingresosDeHoy(state.reservaciones), [state.reservaciones]);
   const recientes = useMemo(
     () => [...state.reservaciones].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8),
@@ -58,8 +83,13 @@ export default function UsuarioDashboard() {
               {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
           </View>
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>{getIniciales(state.user?.name ?? 'AV')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing[2] }}>
+            <View style={styles.avatarWrap}>
+              <Text style={styles.avatarText}>{getIniciales(state.user?.name ?? 'AV')}</Text>
+            </View>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutHeaderBtn} activeOpacity={0.8}>
+              <Ionicons name="log-out" size={20} color={Colors.white} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -73,26 +103,26 @@ export default function UsuarioDashboard() {
             value={String(deHoy.length)}
             sub="Registradas hoy"
           />
-          <MetricCard
+          {/* <MetricCard
             icon="cash"
             iconColor={Colors.success}
             iconBg={Colors.successLight}
             label="Ingresos del día"
             value={formatMXN(ingresos)}
             sub="Pagadas hoy"
-          />
-          <MetricCard
+          /> */}
+          {/* <MetricCard
             icon="people"
             iconColor={Colors.tertiary[500]}
             iconBg={Colors.tertiary[50]}
             label="Personas hoy"
             value={String(deHoy.reduce((s, r) => s + r.numPersonas, 0))}
             sub="Total pasajeros"
-          />
+          /> */}
         </ScrollView>
 
         {/* ── Tendencia ── */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tendencia Mensual</Text>
           <Card>
             <View style={styles.chartWrap}>
@@ -109,7 +139,7 @@ export default function UsuarioDashboard() {
               ))}
             </View>
           </Card>
-        </View>
+        </View> */}
 
         {/* ── Reservaciones recientes ── */}
         <View style={[styles.section, { paddingBottom: 96 }]}>
@@ -200,6 +230,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   avatarText: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.white },
+  logoutHeaderBtn: {
+    padding: Spacing[2],
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: BorderRadius.full,
+  },
 
   metricRow: { paddingHorizontal: Spacing[4], paddingVertical: Spacing[3], gap: Spacing[3] },
   metricCard: { width: 165, gap: Spacing[2] },

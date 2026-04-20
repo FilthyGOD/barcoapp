@@ -1,6 +1,6 @@
 /**
  * Layout de navegación — Rol ADMIN.
- * Bottom tabs: Dashboard · Pagos · Reportes · Más (Config + Bitácora)
+ * Bottom tabs: Dashboard · Pagos · Reportes · Config
  */
 
 import { Tabs, useRouter } from 'expo-router';
@@ -34,9 +34,6 @@ export default function AdminLayout() {
           backgroundColor: Colors.white,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 10,
-          paddingTop: 8,
         },
         tabBarActiveTintColor: Colors.secondary[500],
         tabBarInactiveTintColor: Colors.textMuted,
@@ -79,15 +76,6 @@ export default function AdminLayout() {
           title: 'Config',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="bitacora"
-        options={{
-          title: 'Bitácora',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="journal" size={size} color={color} />
           ),
         }}
       />

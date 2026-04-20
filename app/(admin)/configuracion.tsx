@@ -10,9 +10,12 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 import { useAppStore } from '@/src/core/store/AppContext';
 import { ConfigState } from '@/src/core/types/bitacora.types';
@@ -26,6 +29,7 @@ import { BorderRadius, Spacing } from '@/src/core/theme/spacing';
 
 export default function ConfiguracionScreen() {
   const { state, dispatch, registrarBitacora } = useAppStore();
+  const router = useRouter();
   const [config, setConfig] = useState<ConfigState>(state.config);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty]   = useState(false);
@@ -71,6 +75,33 @@ export default function ConfiguracionScreen() {
         },
       },
     ]);
+  };
+
+  const handleLogout = () => {
+    const performLogout = () => {
+      registrarBitacora('LOGOUT', `Cierre de sesión — ${state.user?.name ?? 'Usuario'}`);
+      dispatch({ type: 'LOGOUT' });
+      setTimeout(() => router.replace('/login'), 100);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
+        performLogout();
+      }
+    } else {
+      Alert.alert(
+        'Cerrar Sesión',
+        '¿Estás seguro de que deseas cerrar sesión?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Cerrar Sesión',
+            style: 'destructive',
+            onPress: performLogout,
+          },
+        ],
+      );
+    }
   };
 
   return (
@@ -122,7 +153,7 @@ export default function ConfiguracionScreen() {
                 value={String(config.porcentajeDescuento)}
                 onChangeText={t => update('porcentajeDescuento', parseInt(t.replace(/\D/g, ''), 10) || 0)}
                 keyboardType="numeric"
-                leftIcon="percent"
+                leftIcon="pricetags-outline"
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -181,6 +212,18 @@ export default function ConfiguracionScreen() {
             💾 Guardar cambios
           </Button>
         </View>
+
+        {/* ── Cerrar Sesión ── */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+          <View style={styles.logoutIcon}>
+            <Ionicons name="log-out" size={20} color={Colors.danger} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.logoutText}>Cerrar Sesión</Text>
+            <Text style={styles.logoutSub}>Salir de la cuenta actual</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -282,4 +325,33 @@ const styles = StyleSheet.create({
   previewVal: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, color: Colors.secondary[700] },
 
   actions: { flexDirection: 'row', gap: Spacing[3] },
+
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing[3],
+    padding: Spacing[4],
+    backgroundColor: Colors.dangerLight,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.danger + '30',
+  },
+  logoutIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+    color: Colors.danger,
+  },
+  logoutSub: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
 });

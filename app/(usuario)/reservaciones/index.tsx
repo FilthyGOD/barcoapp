@@ -48,9 +48,9 @@ export default function ReservacionesScreen() {
   const { state, dispatch, registrarBitacora } = useAppStore();
   const router = useRouter();
 
-  const [busqueda, setBusqueda]   = useState('');
-  const [filtro, setFiltro]       = useState<FiltroEstado>('todos');
-  const [pagina, setPagina]       = useState(1);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtro, setFiltro] = useState<FiltroEstado>('todos');
+  const [pagina, setPagina] = useState(1);
 
   const filtradas = useMemo(() => {
     return filtrarReservaciones(state.reservaciones, {
@@ -60,7 +60,7 @@ export default function ReservacionesScreen() {
   }, [state.reservaciones, filtro, busqueda]);
 
   const paginadas = filtradas.slice(0, pagina * PAGE_SIZE);
-  const hayMas    = paginadas.length < filtradas.length;
+  const hayMas = paginadas.length < filtradas.length;
 
   const handleDelete = (res: Reservacion) => {
     Alert.alert(
@@ -112,19 +112,21 @@ export default function ReservacionesScreen() {
       </View>
 
       {/* Filtros de estado */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtrosRow}>
-        {FILTROS.map(f => (
-          <TouchableOpacity
-            key={f.key}
-            onPress={() => { setFiltro(f.key); setPagina(1); }}
-            style={[styles.chip, filtro === f.key && styles.chipActive]}
-          >
-            <Text style={[styles.chipText, filtro === f.key && styles.chipTextActive]}>
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={styles.filtrosContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtrosRow}>
+          {FILTROS.map(f => (
+            <TouchableOpacity
+              key={f.key}
+              onPress={() => { setFiltro(f.key); setPagina(1); }}
+              style={[styles.chip, filtro === f.key && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, filtro === f.key && styles.chipTextActive]}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Lista */}
       <FlatList
@@ -257,11 +259,14 @@ const styles = StyleSheet.create({
 
   searchWrap: { padding: Spacing[3], backgroundColor: Colors.white },
 
+  filtrosContainer: {
+    backgroundColor: Colors.white,
+    paddingBottom: Spacing[3],
+  },
   filtrosRow: {
     paddingHorizontal: Spacing[3],
-    paddingBottom: Spacing[3],
     gap: Spacing[2],
-    backgroundColor: Colors.white,
+    alignItems: 'center',
   },
   chip: {
     paddingHorizontal: Spacing[3],
