@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "barcoapp",
-    "slug": "barcoapp",
+    "name": "Barco Pirata",
+    "slug": "barco-pirata-reservaciones",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "barcoapp",
-    "userInterfaceStyle": "automatic",
+    "scheme": "barcopirata",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
@@ -38,7 +38,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
