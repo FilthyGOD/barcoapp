@@ -1,7 +1,17 @@
 /**
  * AppContext — Estado centralizado de la aplicación.
- * Usa Context API + useReducer. Persistido en AsyncStorage.
- * Preparado para migrar a Zustand o Redux en producción.
+ * 
+ * ARQUITECTURA: Supabase-First con cache local (AsyncStorage).
+ * 
+ * Lectura:
+ *   1. Intenta cargar de Supabase
+ *   2. Si falla (sin internet) → fallback a AsyncStorage cache
+ *   3. Si ambos vacíos → usa seed data
+ * 
+ * Escritura:
+ *   1. Actualiza state inmediatamente (UX rápida)
+ *   2. Persiste en AsyncStorage (cache local)
+ *   3. Sincroniza con Supabase en background (async, no bloquea UI)
  */
 
 import React, {
@@ -17,6 +27,8 @@ import { Pago } from '@/src/core/types/pago.types';
 import { User } from '@/src/core/types/auth.types';
 import { BitacoraEntry, ConfigState, DEFAULT_CONFIG } from '@/src/core/types/bitacora.types';
 import { StorageService } from '@/src/core/services/storage.service';
+import { SupabaseService } from '@/src/core/services/supabase.service';
+import { migrarDatosLocalesASupabase } from '@/src/core/services/migrateToSupabase';
 import { generateId } from '@/src/core/utils/formatters';
 import {
   SEED_RESERVACIONES,
@@ -33,6 +45,8 @@ interface AppState {
   pagos: Pago[];
   config: ConfigState;
   bitacora: BitacoraEntry[];
+  /** Indica si los datos se cargaron de Supabase o del cache local */
+  dataSource: 'supabase' | 'local' | 'seed';
 }
 
 const initialState: AppState = {
@@ -42,6 +56,7 @@ const initialState: AppState = {
   pagos: [],
   config: DEFAULT_CONFIG,
   bitacora: [],
+  dataSource: 'local',
 };
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -120,16 +135,83 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+// ── Sync helpers (fire-and-forget, no bloquean UI) ───────────────────────────
+
+function syncToSupabase(action: Action) {
+  switch (action.type) {
+    case 'ADD_RESERVACION':
+      SupabaseService.addReservacion(action.payload).catch(() => {});
+      break;
+    case 'UPDATE_RESERVACION':
+      SupabaseService.updateReservacion(action.payload).catch(() => {});
+      break;
+    case 'DELETE_RESERVACION':
+      SupabaseService.deleteReservacion(action.payload).catch(() => {});
+      break;
+    case 'ADD_PAGO':
+      SupabaseService.addPago(action.payload).catch(() => {});
+      break;
+    case 'SET_CONFIG':
+      SupabaseService.setConfig(action.payload).catch(() => {});
+      break;
+    case 'ADD_BITACORA':
+      SupabaseService.addBitacora(action.payload).catch(() => {});
+      break;
+  }
+}
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, rawDispatch] = useReducer(reducer, initialState);
 
-  // Carga inicial desde AsyncStorage
+  // Dispatch wrapper: actualiza state + sincroniza con Supabase
+  const dispatch = useCallback((action: Action) => {
+    rawDispatch(action);
+    syncToSupabase(action);
+  }, []);
+
+  // ── Carga inicial: Supabase-First con fallback local ──────────────────────
   useEffect(() => {
     (async () => {
       try {
-        // Sembrar datos de prueba si es primer arranque
+        // 1. Intentar migrar datos locales existentes a Supabase (una sola vez)
+        await migrarDatosLocalesASupabase();
+
+        // 2. Intentar cargar de Supabase primero
+        const [sbReservaciones, sbPagos, sbConfig, sbBitacora] = await Promise.all([
+          SupabaseService.getReservaciones(),
+          SupabaseService.getPagos(),
+          SupabaseService.getConfig(),
+          SupabaseService.getBitacora(),
+        ]);
+
+        const supabaseOk = sbReservaciones !== null;
+
+        if (supabaseOk) {
+          // ✅ Supabase respondió — usar como fuente de verdad
+          const payload = {
+            reservaciones: sbReservaciones!,
+            pagos: sbPagos ?? [],
+            config: sbConfig ?? DEFAULT_CONFIG,
+            bitacora: sbBitacora ?? [],
+            dataSource: 'supabase' as const,
+          };
+
+          // Actualizar cache local con datos frescos de Supabase
+          await Promise.all([
+            StorageService.setReservaciones(payload.reservaciones),
+            StorageService.setPagos(payload.pagos),
+            StorageService.setConfig(payload.config),
+            StorageService.setBitacora(payload.bitacora),
+          ]);
+
+          rawDispatch({ type: 'HYDRATE', payload });
+          console.log('[AppContext] ✅ Datos cargados de Supabase');
+          return;
+        }
+
+        // 3. Supabase no disponible → fallback a cache local
         const seeded = await StorageService.isSeeded();
         if (!seeded) {
           await StorageService.setReservaciones(SEED_RESERVACIONES);
@@ -145,43 +227,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           StorageService.getBitacora(),
         ]);
 
-        dispatch({
+        rawDispatch({
           type: 'HYDRATE',
           payload: {
             reservaciones: (reservaciones as Reservacion[]) ?? SEED_RESERVACIONES,
             pagos:         (pagos as Pago[]) ?? SEED_PAGOS,
             config:        config ?? DEFAULT_CONFIG,
             bitacora:      (bitacora as BitacoraEntry[]) ?? SEED_BITACORA,
+            dataSource: 'local' as const,
           },
         });
+        console.log('[AppContext] ⚠️ Sin conexión Supabase, usando cache local');
       } catch (e) {
-        dispatch({ type: 'SET_LOADING', payload: false });
+        console.warn('[AppContext] Error en carga inicial:', e);
+        rawDispatch({ type: 'SET_LOADING', payload: false });
       }
     })();
   }, []);
 
-  // Persistir reservaciones cuando cambian
+  // Persistir reservaciones en cache local cuando cambian
   useEffect(() => {
     if (!state.isLoading) {
       StorageService.setReservaciones(state.reservaciones);
     }
   }, [state.reservaciones, state.isLoading]);
 
-  // Persistir pagos cuando cambian
+  // Persistir pagos en cache local cuando cambian
   useEffect(() => {
     if (!state.isLoading) {
       StorageService.setPagos(state.pagos);
     }
   }, [state.pagos, state.isLoading]);
 
-  // Persistir config cuando cambia
+  // Persistir config en cache local cuando cambia
   useEffect(() => {
     if (!state.isLoading) {
       StorageService.setConfig(state.config);
     }
   }, [state.config, state.isLoading]);
 
-  // Persistir bitácora cuando cambia
+  // Persistir bitácora en cache local cuando cambia
   useEffect(() => {
     if (!state.isLoading) {
       StorageService.setBitacora(state.bitacora);
@@ -201,7 +286,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
       dispatch({ type: 'ADD_BITACORA', payload: entry });
     },
-    [state.user]
+    [state.user, dispatch]
   );
 
   return (
