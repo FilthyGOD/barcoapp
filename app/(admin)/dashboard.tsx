@@ -14,7 +14,9 @@ import {
   TextInput,
   ScrollView,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -44,6 +46,7 @@ import { BorderRadius, Spacing } from '@/src/core/theme/spacing';
 export default function AdminDashboard() {
   const { state, dispatch, registrarBitacora } = useAppStore();
   const { width } = useWindowDimensions();
+  const isWide = width >= 768;
 
   const [busqueda, setBusqueda] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
@@ -97,17 +100,24 @@ export default function AdminDashboard() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* ── Header ── */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Buenos días, {state.user?.name?.split(' ')[0]} 👋</Text>
-            <Text style={styles.subtitle}>Resumen del día · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
-          </View>
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>
-              {getIniciales(state.user?.name ?? 'CM')}
-            </Text>
-          </View>
-        </View>
+        {!isWide && (
+          <LinearGradient
+            colors={[Colors.primary[400], Colors.primary[600]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.header}
+          >
+            <View>
+              <Text style={styles.greeting}>Buenos días, {state.user?.name?.split(' ')[0]} 👋</Text>
+              <Text style={styles.subtitle}>Resumen del día · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+            </View>
+            <View style={styles.avatarWrap}>
+              <Text style={styles.avatarText}>
+                {getIniciales(state.user?.name ?? 'CM')}
+              </Text>
+            </View>
+          </LinearGradient>
+        )}
 
         {/* ── Métricas ── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.metricRow}>
@@ -318,7 +328,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: Spacing[4],
-    backgroundColor: Colors.primary[500],
   },
   greeting: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.white },
   subtitle: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
