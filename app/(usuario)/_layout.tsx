@@ -4,6 +4,7 @@
  */
 
 import { Tabs, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '@/src/core/store/AppContext';
@@ -26,12 +27,18 @@ export default function UsuarioLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: Colors.white,
-          borderTopColor: Colors.border,
-          borderTopWidth: 1,
+          borderTopWidth: 0, // Quitamos el borde para un look más limpio con el degradado
         },
-        tabBarActiveTintColor: Colors.secondary[500],
-        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarBackground: () => (
+          <LinearGradient
+            colors={[Colors.primary[400], Colors.primary[600]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ flex: 1 }}
+          />
+        ),
+        tabBarActiveTintColor: Colors.white,
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.6)',
         tabBarLabelStyle: {
           fontSize: FontSize.xs,
           fontWeight: FontWeight.semibold,
@@ -58,10 +65,14 @@ export default function UsuarioLayout() {
       />
       <Tabs.Screen
         name="pagos/index"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="perfil"
         options={{
-          title: 'Pagos',
+          title: 'Perfil',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="card" size={size} color={color} />
+            <Ionicons name="person" size={size} color={color} />
           ),
         }}
       />

@@ -5,6 +5,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -120,7 +121,7 @@ export default function LoginScreen() {
   const formContent = (
     <Animated.View
       style={[
-        styles.formCard,
+        styles.formCardContainer,
         isWide && styles.formCardWide,
         {
           opacity: fadeAnim,
@@ -131,11 +132,12 @@ export default function LoginScreen() {
         },
       ]}
     >
-      <ScrollView
-        contentContainerStyle={styles.formScroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <BlurView intensity={Platform.OS === 'ios' ? 40 : 80} tint="dark" style={styles.formCard}>
+        <ScrollView
+          contentContainerStyle={styles.formScroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.formHeader}>
           <Text style={styles.formTitle}>Bienvenido</Text>
           <Text style={styles.formSubtitle}>Ingresa tus datos para acceder al sistema</Text>
@@ -238,6 +240,7 @@ export default function LoginScreen() {
           © 2025 Barco Pirata de Puerto Peñasco{'\n'}Todos los derechos reservados
         </Text>
       </ScrollView>
+      </BlurView>
     </Animated.View>
   );
 
@@ -429,22 +432,29 @@ const styles = StyleSheet.create({
   },
 
   // Card de Cristal
-  formCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 24,
-    padding: 32,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+  formCardContainer: {
     width: '100%',
+    borderRadius: 24,
     ...Shadow.lg,
     ...(Platform.OS === 'web' ? {
-      backdropFilter: 'blur(30px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(30px) saturate(160%)',
       boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
     } as any : {}),
   },
   formCardWide: {
     maxWidth: 420,
+  },
+  formCard: {
+    backgroundColor: Platform.OS === 'web' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(60, 45, 10, 0.4)',
+    borderRadius: 24,
+    padding: 32,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    width: '100%',
+    overflow: 'hidden',
+    ...(Platform.OS === 'web' ? {
+      backdropFilter: 'blur(30px) saturate(160%)',
+      WebkitBackdropFilter: 'blur(30px) saturate(160%)',
+    } as any : {}),
   },
   formScroll: {
     gap: 18,

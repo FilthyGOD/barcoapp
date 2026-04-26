@@ -37,12 +37,18 @@ export default function AdminLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: isWide ? { display: 'none' } : {
-            backgroundColor: Colors.white,
-            borderTopColor: Colors.border,
-            borderTopWidth: 1,
+            borderTopWidth: 0,
           },
-          tabBarActiveTintColor: Colors.secondary[500],
-          tabBarInactiveTintColor: Colors.textMuted,
+          tabBarBackground: isWide ? undefined : () => (
+            <LinearGradient
+              colors={[Colors.primary[400], Colors.primary[600]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flex: 1 }}
+            />
+          ),
+          tabBarActiveTintColor: Colors.white,
+          tabBarInactiveTintColor: 'rgba(255,255,255,0.6)',
           tabBarLabelStyle: {
             fontSize: FontSize.xs,
             fontWeight: FontWeight.semibold,
@@ -59,13 +65,17 @@ export default function AdminLayout() {
         }}
       />
       <Tabs.Screen
-        name="pagos/index"
+        name="reservaciones/index"
         options={{
-          title: 'Pagos',
+          title: 'Reservaciones',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="card" size={size} color={color} />
+            <Ionicons name="calendar" size={size} color={color} />
           ),
         }}
+      />
+      <Tabs.Screen
+        name="pagos/index"
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="reportes"
@@ -73,6 +83,15 @@ export default function AdminLayout() {
           title: 'Reportes',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bar-chart" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="perfil"
+        options={{
+          title: 'Perfil',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
           ),
         }}
       />
@@ -86,6 +105,8 @@ export default function AdminLayout() {
         }}
       />
       {/* Rutas ocultas del tab bar */}
+      <Tabs.Screen name="reservaciones/nueva" options={{ href: null }} />
+      <Tabs.Screen name="reservaciones/[id]" options={{ href: null }} />
       <Tabs.Screen name="pagos/[id]" options={{ href: null }} />
     </Tabs>
     </View>
@@ -97,8 +118,9 @@ export default function AdminLayout() {
 function WebTopNavigation({ state, router, pathname, pendientes }: any) {
   const tabs = [
     { key: '/dashboard', label: 'Inicio', icon: 'grid', badge: pendientes },
-    { key: '/pagos', label: 'Pagos', icon: 'card' },
+    { key: '/reservaciones', label: 'Reservaciones', icon: 'calendar' },
     { key: '/reportes', label: 'Reportes', icon: 'bar-chart' },
+    { key: '/perfil', label: 'Perfil', icon: 'person' },
     { key: '/configuracion', label: 'Config', icon: 'settings' },
   ];
 

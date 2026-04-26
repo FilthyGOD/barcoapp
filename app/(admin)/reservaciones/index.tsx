@@ -35,7 +35,7 @@ import { Colors } from '@/src/core/theme/colors';
 import { FontSize, FontWeight } from '@/src/core/theme/typography';
 import { BorderRadius, Spacing } from '@/src/core/theme/spacing';
 
-type TabType = 'aceptadas' | 'pendientes' | 'historial';
+type TabType = 'pendientes' | 'historial';
 
 const PAGE_SIZE = 10;
 
@@ -44,7 +44,7 @@ export default function ReservacionesScreen() {
   const router = useRouter();
 
   const [busqueda, setBusqueda] = useState('');
-  const [activeTab, setActiveTab] = useState<TabType>('aceptadas');
+  const [activeTab, setActiveTab] = useState<TabType>('pendientes');
   const [pagina, setPagina] = useState(1);
 
   const [pagoModalVisible, setPagoModalVisible] = useState(false);
@@ -58,10 +58,8 @@ export default function ReservacionesScreen() {
     return basico.filter(r => {
       if (activeTab === 'pendientes') {
         return r.estado === 'pendiente';
-      } else if (activeTab === 'aceptadas') {
-        return r.estado === 'aceptada';
       } else {
-        return r.estado === 'pagado' || r.estado === 'rechazada';
+        return r.estado !== 'pendiente';
       }
     }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [state.reservaciones, activeTab, busqueda]);
@@ -85,6 +83,24 @@ export default function ReservacionesScreen() {
               `Reservación ${res.folio} eliminada — ${res.clienteNombre}`,
               { folio: res.folio },
             );
+          },
+        },
+      ],
+    );
+  };
+
+  const handleAceptar = (res: Reservacion) => {
+    Alert.alert(
+      'Aceptar reservación',
+      `¿Confirmas aceptar la reservación de ${res.clienteNombre}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Aceptar',
+          style: 'default',
+          onPress: () => {
+            dispatch({ type: 'UPDATE_RESERVACION', payload: { ...res, estado: 'aceptada' } });
+            registrarBitacora('RESERVACION_ACEPTADA', `Reservación ${res.folio} aceptada`, { folio: res.folio });
           },
         },
       ],
@@ -139,15 +155,6 @@ export default function ReservacionesScreen() {
       <View style={styles.tabsContainer}>
         <View style={styles.tabsWrapper}>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'aceptadas' && styles.tabBtnActive]}
-            onPress={() => { setActiveTab('aceptadas'); setPagina(1); }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabText, activeTab === 'aceptadas' && styles.tabTextActive]}>
-              Aceptadas
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'pendientes' && styles.tabBtnActive]}
             onPress={() => { setActiveTab('pendientes'); setPagina(1); }}
             activeOpacity={0.8}
@@ -191,6 +198,7 @@ export default function ReservacionesScreen() {
               setResParaPago(res);
               setPagoModalVisible(true);
             }}
+            onAceptar={() => handleAceptar(res)}
           />
         )}
         ListFooterComponent={
@@ -233,6 +241,7 @@ function ResCard({
   onDelete,
   onProcesarPago,
   onVerBoleto,
+  onAceptar,
 }: {
   res: Reservacion;
   isHistorial?: boolean;
@@ -240,35 +249,25 @@ function ResCard({
   onDelete: () => void;
   onProcesarPago?: () => void;
   onVerBoleto?: () => void;
+  onAceptar?: () => void;
 }) {
   if (isHistorial) {
-    const isCard = res.folio.charCodeAt(res.folio.length - 1) % 2 === 0;
     return (
       <Card style={styles.resCard}>
-        <View style={[styles.resTop, { alignItems: 'flex-start' }]}>
-          <View style={[styles.resAvatar, { backgroundColor: Colors.successLight }]}>
-            <Ionicons name={isCard ? "card" : "cash"} size={22} color={Colors.success} />
+        <View style={styles.resTop}>
+          <View style={styles.resAvatar}>
+            <Text style={styles.resAvatarText}>{getIniciales(res.clienteNombre)}</Text>
           </View>
-          <View style={styles.resInfoWrapper}>
-            <View style={styles.resInfoRow}>
-              <Text style={styles.resFolio}>{res.folio}</Text>
-              <Text style={[styles.resTotal, { color: Colors.primary[700] }]}>{formatMXN(res.total)}</Text>
-            </View>
-            <View style={styles.resInfoRow}>
-              <Text style={styles.resNombre}>{res.clienteNombre}</Text>
-            </View>
-            <View style={styles.resInfoRow}>
-              <Text style={[styles.resDetalle, { fontSize: FontSize.xs }]}>
-                {formatFecha(res.fechaPaseo)}, {res.horaPaseo}
-              </Text>
-            </View>
-            {isCard && (
-              <View style={styles.resInfoRow}>
-                <Text style={[styles.resDetalle, { fontSize: FontSize.xs }]}>
-                  Tarjeta --{res.id.replace(/\D/g, '').slice(-4) || '1234'}
-                </Text>
-              </View>
-            )}
+          <View style={styles.resInfo}>
+            <Text style={styles.resFolio}>{res.folio}</Text>
+            <Text style={styles.resNombre}>{res.clienteNombre}</Text>
+            <Text style={styles.resDetalle}>
+              {formatFecha(res.fechaPaseo)} · {res.horaPaseo} · {nombrePaquete(res.paquete)} · {res.numPersonas} pers.
+            </Text>
+          </View>
+          <View style={styles.resRight}>
+            <Text style={styles.resTotal}>{formatMXN(res.total)}</Text>
+            <Badge estado={res.estado} size="sm" />
           </View>
         </View>
       </Card>
@@ -301,10 +300,14 @@ function ResCard({
       {/* Acciones */}
       <View style={styles.resActions}>
         {res.estado === 'pendiente' ? (
-          <View style={[styles.btnProcesar, { backgroundColor: '#FFF7ED', borderColor: '#FED7AA', borderWidth: 1 }]}>
-            <Ionicons name="time-outline" size={18} color="#F97316" />
-            <Text style={[styles.btnProcesarText, { color: '#F97316' }]}>Esperando aprobación del Capitán</Text>
-          </View>
+          <TouchableOpacity
+            style={[styles.btnProcesar, { backgroundColor: Colors.success }]}
+            onPress={onAceptar}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="checkmark-circle-outline" size={18} color={Colors.white} />
+            <Text style={styles.btnProcesarText}>Aceptar Reservación</Text>
+          </TouchableOpacity>
         ) : res.estado === 'aceptada' ? (
           <TouchableOpacity
             style={styles.btnProcesar}
@@ -607,6 +610,8 @@ const styles = StyleSheet.create({
   },
   resAvatarText: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: Colors.primary[500] },
   resInfoWrapper: { flex: 1, gap: 4, justifyContent: 'center' },
+  resInfo: { flex: 1 },
+  resRight: { alignItems: 'flex-end', gap: 4 },
   resInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   resFolio: { fontSize: FontSize.xs, color: Colors.textMuted, fontFamily: 'monospace' },
   resTotal: { fontSize: FontSize.md, fontWeight: FontWeight.bold, color: Colors.primary[500] },

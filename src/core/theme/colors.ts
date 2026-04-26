@@ -6,7 +6,7 @@
 export const Colors = {
   // Azul marino profundo — color primario
   primary: {
-    50:  '#e6eef4',
+    50: '#f0f2f5',
     100: '#b3cde0',
     200: '#80abcc',
     300: '#4d8ab8',
@@ -20,7 +20,7 @@ export const Colors = {
 
   // Turquesa/Teal — color secundario
   secondary: {
-    50:  '#e0f5f5',
+    50: '#e0f5f5',
     100: '#b3e6e6',
     200: '#80d6d6',
     300: '#4dc6c6',
@@ -34,7 +34,7 @@ export const Colors = {
 
   // Dorado — color terciario/acento
   tertiary: {
-    50:  '#f9f2e3',
+    50: '#f9f2e3',
     100: '#eedeb8',
     200: '#e3c98a',
     300: '#d8b45c',
@@ -48,7 +48,7 @@ export const Colors = {
 
   // Neutral
   neutral: {
-    50:  '#F4F7F9',
+    50: '#F4F7F9',
     100: '#E8EDF2',
     200: '#D1DCE5',
     300: '#B0C1CE',
@@ -65,9 +65,9 @@ export const Colors = {
   successLight: '#E3FCEF',
   warning: '#FF8B00',
   warningLight: '#FFF4E5',
-  danger:  '#E5484D',
+  danger: '#E5484D',
   dangerLight: '#FFECEC',
-  info:    '#0091FF',
+  info: '#0091FF',
   infoLight: '#E8F4FF',
 
   // Base

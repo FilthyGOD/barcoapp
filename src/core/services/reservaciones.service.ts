@@ -7,20 +7,21 @@ import { Reservacion, ReservacionFormData } from '@/src/core/types/reservacion.t
 import { ConfigState } from '@/src/core/types/bitacora.types';
 import { generarFolioReservacion, generateId } from '@/src/core/utils/formatters';
 
-/** Calcula subtotal, descuento y total de una reservación */
+/** Calcula subtotal, descuento, impuesto y total de una reservación */
 export const calcularTotales = (
   numPersonas: number,
   paquete: 'comida' | 'bebidas' | 'paseo',
   config: ConfigState,
-): { subtotal: number; descuento: number; total: number } => {
+): { subtotal: number; descuento: number; impuesto: number; total: number } => {
   const precio = config.precios[paquete];
   const subtotal = precio * numPersonas;
   const aplicaDescuento = numPersonas >= config.minPersonasDescuento;
   const descuento = aplicaDescuento
     ? Math.round(subtotal * (config.porcentajeDescuento / 100))
     : 0;
-  const total = subtotal - descuento;
-  return { subtotal, descuento, total };
+  const impuesto = subtotal * 0.1;
+  const total = subtotal - descuento + impuesto;
+  return { subtotal, descuento, impuesto, total };
 };
 
 /** Crea una nueva reservación con todos sus campos calculados */
@@ -30,7 +31,7 @@ export const crearReservacion = (
   userId: string,
   totalExistentes: number,
 ): Reservacion => {
-  const { subtotal, descuento, total } = calcularTotales(
+  const { subtotal, descuento, impuesto, total } = calcularTotales(
     formData.numPersonas,
     formData.paquete,
     config,
@@ -56,7 +57,7 @@ export const actualizarReservacion = (
   formData: ReservacionFormData,
   config: ConfigState,
 ): Reservacion => {
-  const { subtotal, descuento, total } = calcularTotales(
+  const { subtotal, descuento, impuesto, total } = calcularTotales(
     formData.numPersonas,
     formData.paquete,
     config,
