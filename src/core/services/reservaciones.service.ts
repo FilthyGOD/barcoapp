@@ -28,7 +28,7 @@ export const calcularTotales = (
 export const crearReservacion = (
   formData: ReservacionFormData,
   config: ConfigState,
-  userId: string,
+  userId: string | undefined,
   totalExistentes: number,
 ): Reservacion => {
   const { subtotal, descuento, impuesto, total } = calcularTotales(

@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { useAppStore } from '@/src/core/store/AppContext';
+import { AuthService } from '@/src/core/services/auth.service';
 import {
   reservacionesDeHoy,
   ingresosDeHoy,
@@ -37,12 +38,12 @@ import { FontSize, FontWeight } from '@/src/core/theme/typography';
 import { BorderRadius, Spacing } from '@/src/core/theme/spacing';
 
 export default function UsuarioDashboard() {
-  const { state, dispatch, registrarBitacora } = useAppStore();
+  const { state, dispatch } = useAppStore();
   const router = useRouter();
 
   const handleLogout = () => {
-    const performLogout = () => {
-      registrarBitacora('LOGOUT', `Cierre de sesión — ${state.user?.name ?? 'Usuario'}`);
+    const performLogout = async () => {
+      await AuthService.signOut();
       dispatch({ type: 'LOGOUT' });
       setTimeout(() => router.replace('/login'), 100);
     };

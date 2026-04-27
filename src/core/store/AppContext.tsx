@@ -12,6 +12,11 @@
  *   1. Actualiza state inmediatamente (UX rápida)
  *   2. Persiste en AsyncStorage (cache local)
  *   3. Sincroniza con Supabase en background (async, no bloquea UI)
+ * 
+ * Autenticación:
+ *   - Usa Supabase Auth (signInWithPassword / signUp)
+ *   - Sesiones persistidas con AsyncStorage
+ *   - Auto-login si hay sesión activa
  */
 
 import React, {
@@ -28,8 +33,10 @@ import { User } from '@/src/core/types/auth.types';
 import { BitacoraEntry, ConfigState, DEFAULT_CONFIG } from '@/src/core/types/bitacora.types';
 import { StorageService } from '@/src/core/services/storage.service';
 import { SupabaseService } from '@/src/core/services/supabase.service';
+import { AuthService } from '@/src/core/services/auth.service';
 import { migrarDatosLocalesASupabase } from '@/src/core/services/migrateToSupabase';
 import { generateId } from '@/src/core/utils/formatters';
+import { supabase } from '@/src/core/services/supabaseClient';
 import {
   SEED_RESERVACIONES,
   SEED_PAGOS,
@@ -175,10 +182,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        // 1. Intentar migrar datos locales existentes a Supabase (una sola vez)
+        // 1. Verificar si hay sesión activa de Supabase Auth
+        const user = await AuthService.getUserFromSession();
+        if (user) {
+          rawDispatch({ type: 'LOGIN', payload: user });
+          console.log('[AppContext] ✅ Sesión restaurada:', user.email);
+        }
+
+        // 2. Intentar migrar datos locales existentes a Supabase (una sola vez)
         await migrarDatosLocalesASupabase();
 
-        // 2. Intentar cargar de Supabase primero
+        // 3. Intentar cargar de Supabase primero
         const [sbReservaciones, sbPagos, sbConfig, sbBitacora] = await Promise.all([
           SupabaseService.getReservaciones(),
           SupabaseService.getPagos(),
@@ -211,7 +225,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // 3. Supabase no disponible → fallback a cache local
+        // 4. Supabase no disponible → fallback a cache local
         const seeded = await StorageService.isSeeded();
         if (!seeded) {
           await StorageService.setReservaciones(SEED_RESERVACIONES);
@@ -243,6 +257,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         rawDispatch({ type: 'SET_LOADING', payload: false });
       }
     })();
+  }, []);
+
+  // ── Listener de cambios de sesión (logout externo, token expirado) ────────
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          rawDispatch({ type: 'LOGOUT' });
+          console.log('[AppContext] 🔒 Sesión cerrada');
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Persistir reservaciones en cache local cuando cambian
@@ -280,7 +310,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         tipo,
         descripcion,
         usuario: state.user?.name ?? 'Sistema',
-        usuarioId: state.user?.id ?? 'system',
+        usuarioId: state.user?.id ?? undefined,
         createdAt: new Date().toISOString(),
         meta,
       };

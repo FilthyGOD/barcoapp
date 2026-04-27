@@ -1,7 +1,7 @@
 /**
- * Pantalla de Login — Barco Pirata de Puerto Peñasco.
- * Diseño moderno con fondo completo y card de cristal líquido.
- * Autenticación con Supabase Auth (signInWithPassword).
+ * Pantalla de Registro — Barco Pirata de Puerto Peñasco.
+ * Solo permite crear cuentas con rol 'usuario' (Tripulante).
+ * Misma estética glassmorphism que el login.
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -33,19 +33,21 @@ import { Input } from '@/src/shared/components/ui/Input';
 
 const BG_IMAGE = require('@/assets/images/login-bs.jpg');
 
-// Breakpoint for split-screen vs stacked layout
 const SPLIT_BREAKPOINT = 768;
 
-export default function LoginScreen() {
+export default function RegisterScreen() {
   const router = useRouter();
   const { dispatch, registrarBitacora } = useAppStore();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isWide = windowWidth >= SPLIT_BREAKPOINT;
 
+  const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
   // Animations
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -78,32 +80,39 @@ export default function LoginScreen() {
   };
 
   const validate = () => {
-    const errs: typeof errors = {};
+    const errs: Record<string, string> = {};
+    if (!nombre.trim()) errs.nombre = 'Ingresa tu nombre completo';
     if (!email.trim()) errs.email = 'Ingresa tu correo electrónico';
-    if (!password.trim()) errs.password = 'Ingresa tu contraseña';
+    else if (!/\S+@\S+\.\S+/.test(email)) errs.email = 'Correo electrónico no válido';
+    if (!telefono.trim()) errs.telefono = 'Ingresa tu número de teléfono';
+    if (!password.trim()) errs.password = 'Ingresa una contraseña';
+    else if (password.length < 6) errs.password = 'Mínimo 6 caracteres';
+    if (password !== confirmPassword) errs.confirmPassword = 'Las contraseñas no coinciden';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  const handleLogin = async () => {
+  const handleRegister = async () => {
     if (!validate()) { shake(); return; }
 
     setLoading(true);
 
-    const { user, error } = await AuthService.signIn(
-      email.trim().toLowerCase(),
+    const { user, error } = await AuthService.signUp({
+      email: email.trim().toLowerCase(),
       password,
-    );
+      nombreCompleto: nombre.trim(),
+      telefono: telefono.trim(),
+    });
 
     if (error || !user) {
       setLoading(false);
       shake();
       if (Platform.OS === 'web') {
-        window.alert(error ?? 'Error de autenticación');
+        window.alert(error ?? 'Error al crear la cuenta');
       } else {
         Alert.alert(
-          'Acceso denegado',
-          error ?? 'Correo o contraseña incorrectos.',
+          'Error de Registro',
+          error ?? 'No se pudo crear la cuenta. Intenta de nuevo.',
           [{ text: 'Entendido' }],
         );
       }
@@ -111,15 +120,16 @@ export default function LoginScreen() {
     }
 
     dispatch({ type: 'LOGIN', payload: user });
-    if (user.role === 'admin') {
-      registrarBitacora('LOGIN', `Inicio de sesión — ${user.name}`);
-    }
     setLoading(false);
 
-    router.replace(user.role === 'admin' ? '/(admin)/dashboard' : '/(usuario)/dashboard');
+    router.replace('/(usuario)/dashboard');
   };
 
-  // ── Common Form Card Content ──────────────────────────────────────
+  const clearError = (field: string) => {
+    setErrors(e => ({ ...e, [field]: undefined }));
+  };
+
+  // ── Form Card Content ─────────────────────────────────────────────
   const formContent = (
     <Animated.View
       style={[
@@ -140,80 +150,111 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-        <View style={styles.formHeader}>
-          <Text style={styles.formTitle}>Bienvenido</Text>
-          <Text style={styles.formSubtitle}>Ingresa tus datos para acceder al sistema</Text>
-        </View>
+          <View style={styles.formHeader}>
+            <Text style={styles.formTitle}>Crear Cuenta</Text>
+            <Text style={styles.formSubtitle}>
+              Únete a la tripulación del Barco Pirata
+            </Text>
+          </View>
 
-        <View style={styles.fieldsContainer}>
-          <Input
-            label="Correo electrónico"
-            placeholder="correo@barco.mx"
-            value={email}
-            onChangeText={t => { setEmail(t); setErrors(e => ({ ...e, email: undefined })); }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            leftIcon="mail"
-            error={errors.email}
-          />
-          <Input
-            label="Contraseña"
-            placeholder="••••••••"
-            value={password}
-            onChangeText={t => { setPassword(t); setErrors(e => ({ ...e, password: undefined })); }}
-            isPassword
-            leftIcon="lock-closed"
-            error={errors.password}
-          />
-        </View>
+          {/* Rol Badge */}
+          <View style={styles.rolBadge}>
+            <Ionicons name="person" size={16} color={Colors.secondary[400]} />
+            <Text style={styles.rolBadgeText}>Tripulante</Text>
+          </View>
 
-        <TouchableOpacity style={styles.forgotWrap}>
-          <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
-        </TouchableOpacity>
+          <View style={styles.fieldsContainer}>
+            <Input
+              label="Nombre completo"
+              placeholder="Ej. María López"
+              value={nombre}
+              onChangeText={t => { setNombre(t); clearError('nombre'); }}
+              autoCapitalize="words"
+              leftIcon="person"
+              error={errors.nombre}
+            />
+            <Input
+              label="Correo electrónico"
+              placeholder="correo@ejemplo.com"
+              value={email}
+              onChangeText={t => { setEmail(t); clearError('email'); }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              leftIcon="mail"
+              error={errors.email}
+            />
+            <Input
+              label="Teléfono"
+              placeholder="(638) 383-0000"
+              value={telefono}
+              onChangeText={t => { setTelefono(t); clearError('telefono'); }}
+              keyboardType="phone-pad"
+              leftIcon="call"
+              error={errors.telefono}
+            />
+            <Input
+              label="Contraseña"
+              placeholder="Mínimo 6 caracteres"
+              value={password}
+              onChangeText={t => { setPassword(t); clearError('password'); }}
+              isPassword
+              leftIcon="lock-closed"
+              error={errors.password}
+            />
+            <Input
+              label="Confirmar contraseña"
+              placeholder="Repite tu contraseña"
+              value={confirmPassword}
+              onChangeText={t => { setConfirmPassword(t); clearError('confirmPassword'); }}
+              isPassword
+              leftIcon="lock-closed"
+              error={errors.confirmPassword}
+            />
+          </View>
 
-        <TouchableOpacity
-          onPress={handleLogin}
-          disabled={loading}
-          activeOpacity={0.85}
-          style={[styles.loginBtn, loading && styles.loginBtnDisabled]}
-        >
-          <LinearGradient
-            colors={[Colors.primary[400], Colors.primary[600]]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.loginBtnGradient}
+          <TouchableOpacity
+            onPress={handleRegister}
+            disabled={loading}
+            activeOpacity={0.85}
+            style={[styles.registerBtn, loading && styles.registerBtnDisabled]}
           >
-            {loading ? (
-              <Text style={styles.loginBtnText}>Verificando...</Text>
-            ) : (
-              <>
-                <Text style={styles.loginBtnText}>INICIAR SESIÓN</Text>
-                <Ionicons name="arrow-forward" size={18} color={Colors.white} style={{ marginLeft: 8 }} />
-              </>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={[Colors.secondary[400], Colors.secondary[600]]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.registerBtnGradient}
+            >
+              {loading ? (
+                <Text style={styles.registerBtnText}>Creando cuenta...</Text>
+              ) : (
+                <>
+                  <Text style={styles.registerBtnText}>REGISTRARME</Text>
+                  <Ionicons name="arrow-forward" size={18} color={Colors.white} style={{ marginLeft: 8 }} />
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
 
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>o</Text>
-          <View style={styles.dividerLine} />
-        </View>
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>o</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
-        <TouchableOpacity
-          style={styles.registerBtn}
-          onPress={() => router.push('/register')}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="person-add" size={18} color={Colors.white} />
-          <Text style={styles.registerBtnText}>CREAR CUENTA</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.loginLink}
+            onPress={() => router.back()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.loginLinkText}>Ya tengo cuenta · </Text>
+            <Text style={[styles.loginLinkText, styles.loginLinkBold]}>Iniciar Sesión</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.footer}>
-          © 2025 Barco Pirata de Puerto Peñasco{'\n'}Todos los derechos reservados
-        </Text>
-      </ScrollView>
+          <Text style={styles.footer}>
+            © 2025 Barco Pirata de Puerto Peñasco{'\n'}Todos los derechos reservados
+          </Text>
+        </ScrollView>
       </BlurView>
     </Animated.View>
   );
@@ -230,7 +271,6 @@ export default function LoginScreen() {
           style={styles.absolute}
         >
           {isWide ? (
-            // Layout de Escritorio
             <View style={styles.wideOverlay}>
               <View style={styles.wideHeroSide}>
                 <View style={styles.logoContainer}>
@@ -240,15 +280,15 @@ export default function LoginScreen() {
                   <Text style={styles.logoText}>BARCO PIRATA</Text>
                 </View>
                 <Text style={styles.heroTitle}>
-                  EXPLORA{'\n'}PUERTO PEÑASCO
+                  ÚNETE A LA{'\n'}TRIPULACIÓN
                 </Text>
                 <View style={styles.heroDivider} />
                 <Text style={styles.heroSubtitle}>
-                  Donde Tus Aventuras en el{'\n'}Mar Se Hacen Realidad.
+                  Crea tu cuenta y comienza{'\n'}a vivir la aventura.
                 </Text>
                 <Text style={styles.heroDescription}>
-                  Sistema de reservaciones para experiencias{'\n'}
-                  inolvidables en el Mar de Cortés.
+                  Acceso al sistema de reservaciones{'\n'}
+                  del Barco Pirata de Puerto Peñasco.
                 </Text>
               </View>
               <View style={styles.wideFormSide}>
@@ -256,7 +296,6 @@ export default function LoginScreen() {
               </View>
             </View>
           ) : (
-            // Layout Móvil
             <SafeAreaView style={styles.flex}>
               <KeyboardAvoidingView
                 style={styles.flex}
@@ -273,7 +312,7 @@ export default function LoginScreen() {
                       </View>
                       <Text style={styles.logoText}>BARCO PIRATA</Text>
                     </View>
-                    <Text style={styles.mobileHeroTitle}>Sistema de Reservaciones</Text>
+                    <Text style={styles.mobileHeroTitle}>Crear Cuenta</Text>
                   </View>
                   {formContent}
                 </ScrollView>
@@ -391,7 +430,7 @@ const styles = StyleSheet.create({
     } as any : {}),
   },
   formCardWide: {
-    maxWidth: 420,
+    maxWidth: 440,
   },
   formCard: {
     backgroundColor: Platform.OS === 'web' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(60, 45, 10, 0.4)',
@@ -407,7 +446,7 @@ const styles = StyleSheet.create({
     } as any : {}),
   },
   formScroll: {
-    gap: 18,
+    gap: 16,
   },
   formHeader: {
     marginBottom: 4,
@@ -423,33 +462,41 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     marginTop: 6,
   },
-  fieldsContainer: {
-    gap: 14,
+  rolBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0, 163, 163, 0.2)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 163, 163, 0.4)',
   },
-  forgotWrap: {
-    alignSelf: 'flex-end',
-    marginTop: -8,
-  },
-  forgotText: {
+  rolBadgeText: {
     fontSize: FontSize.sm,
-    color: Colors.white,
-    fontWeight: FontWeight.medium,
+    fontWeight: FontWeight.bold,
+    color: Colors.secondary[300],
   },
-  loginBtn: {
+  fieldsContainer: {
+    gap: 12,
+  },
+  registerBtn: {
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',
   },
-  loginBtnDisabled: {
+  registerBtnDisabled: {
     opacity: 0.6,
   },
-  loginBtnGradient: {
+  registerBtnGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
     paddingHorizontal: 24,
   },
-  loginBtnText: {
+  registerBtnText: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,
     color: Colors.white,
@@ -470,22 +517,18 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontWeight: FontWeight.medium,
   },
-  registerBtn: {
+  loginLink: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
   },
-  registerBtnText: {
+  loginLinkText: {
     fontSize: FontSize.sm,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  loginLinkBold: {
     fontWeight: FontWeight.bold,
     color: Colors.white,
-    letterSpacing: 1,
   },
   footer: {
     textAlign: 'center',

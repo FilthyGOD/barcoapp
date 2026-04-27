@@ -9,6 +9,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  telefono?: string;
   avatar?: string;
 }
 
@@ -20,23 +21,4 @@ export interface AuthState {
 export interface LoginCredentials {
   email: string;
   password: string;
-  role: UserRole;
 }
-
-/** Usuarios de demostración hardcodeados. En producción, reemplazar con API. */
-export const DEMO_USERS: Array<User & { password: string }> = [
-  {
-    id: 'admin-001',
-    name: 'Capitán Morales',
-    email: 'admin@barco.mx',
-    password: 'admin123',
-    role: 'admin',
-  },
-  {
-    id: 'user-001',
-    name: 'Ana Valenzuela',
-    email: 'tripulante@barco.mx',
-    password: 'user123',
-    role: 'usuario',
-  },
-];

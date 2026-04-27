@@ -14,6 +14,7 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,11 +23,14 @@ import { useRouter } from 'expo-router';
 import { useAppStore } from '@/src/core/store/AppContext';
 import { Reservacion } from '@/src/core/types/reservacion.types';
 import { filtrarReservaciones } from '@/src/core/services/reservaciones.service';
+import { Pago } from '@/src/core/types/pago.types';
 import {
   formatMXN,
   formatFecha,
   getIniciales,
   nombrePaquete,
+  generarFolioPago,
+  generateId,
 } from '@/src/core/utils/formatters';
 import { SearchBar } from '@/src/shared/components/ui/SearchBar';
 import { Badge } from '@/src/shared/components/ui/Badge';
@@ -68,55 +72,102 @@ export default function ReservacionesScreen() {
   const hayMas = paginadas.length < filtradas.length;
 
   const handleDelete = (res: Reservacion) => {
+    const doDelete = () => {
+      dispatch({ type: 'DELETE_RESERVACION', payload: res.id });
+      registrarBitacora(
+        'RESERVACION_ELIMINADA',
+        `Reservación ${res.folio} eliminada — ${res.clienteNombre}`,
+        { folio: res.folio },
+      );
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`¿Estás segura de eliminar ${res.folio} — ${res.clienteNombre}?\nEsta acción no se puede deshacer.`)) {
+        doDelete();
+      }
+      return;
+    }
+
     Alert.alert(
       'Eliminar reservación',
       `¿Estás segura de eliminar ${res.folio} — ${res.clienteNombre}?\nEsta acción no se puede deshacer.`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            dispatch({ type: 'DELETE_RESERVACION', payload: res.id });
-            registrarBitacora(
-              'RESERVACION_ELIMINADA',
-              `Reservación ${res.folio} eliminada — ${res.clienteNombre}`,
-              { folio: res.folio },
-            );
-          },
-        },
+        { text: 'Eliminar', style: 'destructive', onPress: doDelete },
       ],
     );
   };
 
   const handleAceptar = (res: Reservacion) => {
+    const doAceptar = () => {
+      dispatch({ type: 'UPDATE_RESERVACION', payload: { ...res, estado: 'pagado' } });
+      registrarBitacora('RESERVACION_ACEPTADA', `Reservación ${res.folio} aceptada`, { folio: res.folio });
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`¿Confirmas aceptar la reservación de ${res.clienteNombre}?`)) {
+        doAceptar();
+      }
+      return;
+    }
+
     Alert.alert(
       'Aceptar reservación',
       `¿Confirmas aceptar la reservación de ${res.clienteNombre}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Aceptar',
-          style: 'default',
-          onPress: () => {
-            dispatch({ type: 'UPDATE_RESERVACION', payload: { ...res, estado: 'aceptada' } });
-            registrarBitacora('RESERVACION_ACEPTADA', `Reservación ${res.folio} aceptada`, { folio: res.folio });
-          },
-        },
+        { text: 'Aceptar', style: 'default', onPress: doAceptar },
       ],
     );
   };
 
-  const handleConfirmarPago = (metodo: 'efectivo' | 'tarjeta') => {
+  const handleRechazar = (res: Reservacion) => {
+    const doRechazar = () => {
+      dispatch({ type: 'UPDATE_RESERVACION', payload: { ...res, estado: 'rechazada' } });
+      registrarBitacora('RESERVACION_RECHAZADA', `Reservación ${res.folio} rechazada`, { folio: res.folio });
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`¿Confirmas rechazar la reservación de ${res.clienteNombre}?`)) {
+        doRechazar();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Rechazar reservación',
+      `¿Confirmas rechazar la reservación de ${res.clienteNombre}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Rechazar', style: 'destructive', onPress: doRechazar },
+      ],
+    );
+  };
+
+  const handleConfirmarPago = (metodo: 'efectivo' | 'tarjeta', cardNumber?: string, tipoCuenta?: 'debito' | 'credito') => {
     if (resParaPago) {
       dispatch({ 
         type: 'UPDATE_RESERVACION', 
         payload: { ...resParaPago, estado: 'pagado' } 
       });
+      
+      const pago: Pago = {
+        id: generateId(),
+        folioPago: generarFolioPago(state.pagos.length),
+        reservacionId: resParaPago.id,
+        metodoPago: metodo,
+        monto: resParaPago.total,
+        ultimos4: metodo === 'tarjeta' && cardNumber ? cardNumber.slice(-4) : undefined,
+        tipoCuenta: metodo === 'tarjeta' ? (tipoCuenta || 'credito') : undefined,
+        procesadoPor: state.user?.id || undefined,
+        procesadoAt: new Date().toISOString(),
+      };
+      dispatch({ type: 'ADD_PAGO', payload: pago });
+
       registrarBitacora(
         'PAGO_PROCESADO',
         `Pago procesado (${metodo}) para folio ${resParaPago.folio}`,
-        { folio: resParaPago.folio, metodo }
+        { folio: resParaPago.folio, metodo, pagoId: pago.id }
       );
     }
     setPagoModalVisible(false);
@@ -134,7 +185,7 @@ export default function ReservacionesScreen() {
         </View>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() => router.push('/(usuario)/reservaciones/nueva')}
+          onPress={() => router.push('/(admin)/reservaciones/nueva')}
           activeOpacity={0.8}
         >
           <Ionicons name="add" size={20} color={Colors.white} />
@@ -188,7 +239,7 @@ export default function ReservacionesScreen() {
           <ResCard
             res={res}
             isHistorial={activeTab === 'historial'}
-            onEdit={() => router.push(`/(usuario)/reservaciones/${res.id}`)}
+            onEdit={() => router.push(`/(admin)/reservaciones/${res.id}`)}
             onDelete={() => handleDelete(res)}
             onVerBoleto={() => {
               setResParaBoleto(res);
@@ -199,6 +250,7 @@ export default function ReservacionesScreen() {
               setPagoModalVisible(true);
             }}
             onAceptar={() => handleAceptar(res)}
+            onRechazar={() => handleRechazar(res)}
           />
         )}
         ListFooterComponent={
@@ -242,6 +294,7 @@ function ResCard({
   onProcesarPago,
   onVerBoleto,
   onAceptar,
+  onRechazar,
 }: {
   res: Reservacion;
   isHistorial?: boolean;
@@ -250,6 +303,7 @@ function ResCard({
   onProcesarPago?: () => void;
   onVerBoleto?: () => void;
   onAceptar?: () => void;
+  onRechazar?: () => void;
 }) {
   if (isHistorial) {
     return (
@@ -300,15 +354,25 @@ function ResCard({
       {/* Acciones */}
       <View style={styles.resActions}>
         {res.estado === 'pendiente' ? (
-          <TouchableOpacity
-            style={[styles.btnProcesar, { backgroundColor: Colors.success }]}
-            onPress={onAceptar}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="checkmark-circle-outline" size={18} color={Colors.white} />
-            <Text style={styles.btnProcesarText}>Aceptar Reservación</Text>
-          </TouchableOpacity>
-        ) : res.estado === 'aceptada' ? (
+          <View style={{ flexDirection: 'row', gap: Spacing[3], flex: 1 }}>
+            <TouchableOpacity
+              style={[styles.btnProcesar, { flex: 1, backgroundColor: Colors.danger }]}
+              onPress={onRechazar}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close-circle-outline" size={18} color={Colors.white} />
+              <Text style={styles.btnProcesarText}>Rechazar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btnProcesar, { flex: 1, backgroundColor: Colors.success }]}
+              onPress={onAceptar}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="checkmark-circle-outline" size={18} color={Colors.white} />
+              <Text style={styles.btnProcesarText}>Aceptar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : res.estado === 'pagado' ? (
           <TouchableOpacity
             style={styles.btnProcesar}
             onPress={onVerBoleto || onEdit}
@@ -332,7 +396,7 @@ function EmptyState() {
       <Text style={styles.emptySub}>Crea la primera reservación del día</Text>
       <TouchableOpacity
         style={styles.emptyBtn}
-        onPress={() => router.push('/(usuario)/reservaciones/nueva')}
+        onPress={() => router.push('/(admin)/reservaciones/nueva')}
       >
         <Text style={styles.emptyBtnText}>+ Nueva Reservación</Text>
       </TouchableOpacity>
@@ -439,9 +503,11 @@ function PagoModal({
   visible: boolean;
   res: Reservacion | null;
   onClose: () => void;
-  onConfirm: (metodo: 'efectivo' | 'tarjeta') => void;
+  onConfirm: (metodo: 'efectivo' | 'tarjeta', cardNumber?: string, tipoCuenta?: 'debito' | 'credito') => void;
 }) {
   const [metodo, setMetodo] = useState<'efectivo' | 'tarjeta'>('efectivo');
+  const [cardNumber, setCardNumber] = useState('');
+  const [tipoCuenta, setTipoCuenta] = useState<'debito' | 'credito'>('credito');
 
   if (!res) return null;
 
@@ -487,15 +553,27 @@ function PagoModal({
                     placeholder="0000 0000 0000 0000"
                     keyboardType="numeric"
                     placeholderTextColor={Colors.textMuted}
+                    value={cardNumber}
+                    onChangeText={setCardNumber}
+                    maxLength={16}
                   />
                 </View>
                 <View>
                   <Text style={styles.label}>Tipo de cuenta</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Crédito / Débito"
-                    placeholderTextColor={Colors.textMuted}
-                  />
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 5 }}>
+                    <TouchableOpacity
+                      style={[styles.metodoBtn, { flex: 1 }, tipoCuenta === 'debito' && styles.metodoBtnActive]}
+                      onPress={() => setTipoCuenta('debito')}
+                    >
+                      <Text style={[styles.metodoText, tipoCuenta === 'debito' && styles.metodoTextActive]}>Débito</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.metodoBtn, { flex: 1 }, tipoCuenta === 'credito' && styles.metodoBtnActive]}
+                      onPress={() => setTipoCuenta('credito')}
+                    >
+                      <Text style={[styles.metodoText, tipoCuenta === 'credito' && styles.metodoTextActive]}>Crédito</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             )}
@@ -507,7 +585,7 @@ function PagoModal({
 
             <TouchableOpacity
               style={styles.btnConfirmarModal}
-              onPress={() => onConfirm(metodo)}
+              onPress={() => onConfirm(metodo, cardNumber, tipoCuenta)}
               activeOpacity={0.8}
             >
               <Text style={styles.btnConfirmarText}>

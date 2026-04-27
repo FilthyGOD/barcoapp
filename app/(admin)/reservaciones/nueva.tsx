@@ -14,6 +14,7 @@ import {
   Platform,
   TextInput,
   useWindowDimensions,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,7 +31,9 @@ import {
   calcularTotales,
   crearReservacion,
 } from '@/src/core/services/reservaciones.service';
-import { formatMXN } from '@/src/core/utils/formatters';
+import { Pago } from '@/src/core/types/pago.types';
+import { generateId } from '@/src/core/utils/formatters';
+import { formatMXN, generarFolioPago } from '@/src/core/utils/formatters';
 import { Colors } from '@/src/core/theme/colors';
 import { FontSize, FontWeight } from '@/src/core/theme/typography';
 import { BorderRadius, Spacing } from '@/src/core/theme/spacing';
@@ -68,6 +71,11 @@ export default function NuevaReservacion() {
   const [paquete, setPaquete]         = useState<PaqueteTipo>('comida');
   const [nombre, setNombre]           = useState('');
   const [telefono, setTelefono]       = useState('');
+  const [metodoPago, setMetodoPago]   = useState<'efectivo' | 'tarjeta'>('efectivo');
+  const [showCardModal, setShowCardModal] = useState(false);
+  const [cardNumber, setCardNumber]   = useState('');
+  const [cardExpiry, setCardExpiry]   = useState('');
+  const [cardCvv, setCardCvv]         = useState('');
   const [loading, setLoading]         = useState(false);
 
   const totales = calcularTotales(personas, paquete, state.config);
@@ -81,11 +89,7 @@ export default function NuevaReservacion() {
     return true;
   };
 
-  const handleGuardar = async () => {
-    if (!validate()) return;
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 400));
-
+  const procesarGuardado = async (estado: 'pendiente' | 'aceptada') => {
     const formData: ReservacionFormData = {
       fechaPaseo: fecha,
       horaPaseo: hora,
@@ -96,13 +100,31 @@ export default function NuevaReservacion() {
       clienteTelefono: telefono.replace(/\D/g, ''),
     };
 
-    const nueva = crearReservacion(formData, state.config, state.user?.id || 'guest', state.reservaciones.length);
+    const nueva = crearReservacion(formData, state.config, state.user?.id || undefined, state.reservaciones.length);
+    nueva.estado = estado; // Update the state based on the payment method
+    
     dispatch({ type: 'ADD_RESERVACION', payload: nueva });
     registrarBitacora(
       'RESERVACION_CREADA',
       `Reservación ${nueva.folio} creada para ${nueva.clienteNombre}`,
-      { folio: nueva.folio, total: nueva.total },
+      { folio: nueva.folio, total: nueva.total, metodoPago },
     );
+
+    if (estado === 'aceptada') {
+      const pago: Pago = {
+        id: generateId(),
+        folioPago: generarFolioPago(state.pagos.length),
+        reservacionId: nueva.id,
+        metodoPago: 'tarjeta',
+        monto: nueva.total,
+        ultimos4: cardNumber.slice(-4),
+        tipoCuenta: 'credito',
+        procesadoPor: state.user?.id || undefined,
+        procesadoAt: new Date().toISOString(),
+      };
+      dispatch({ type: 'ADD_PAGO', payload: pago });
+      registrarBitacora('PAGO_REGISTRADO', `Pago con tarjeta registrado para ${nueva.folio}`, { pagoId: pago.id });
+    }
 
     setLoading(false);
 
@@ -116,6 +138,30 @@ export default function NuevaReservacion() {
         [{ text: 'OK', onPress: () => router.back() }],
       );
     }
+  };
+
+  const handleGuardar = async () => {
+    if (!validate()) return;
+    
+    if (metodoPago === 'efectivo') {
+      setLoading(true);
+      await new Promise(r => setTimeout(r, 400));
+      await procesarGuardado('pendiente');
+    } else {
+      // Si es tarjeta, mostramos el modal para completar el pago
+      setShowCardModal(true);
+    }
+  };
+
+  const handlePagarConTarjeta = async () => {
+    if (cardNumber.length < 15 || cardExpiry.length < 5 || cardCvv.length < 3) {
+      Alert.alert('Error', 'Completa los datos de la tarjeta');
+      return;
+    }
+    setShowCardModal(false);
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 800)); // Simular procesamiento de pago
+    await procesarGuardado('aceptada');
   };
 
   return (
@@ -290,6 +336,38 @@ export default function NuevaReservacion() {
                 <Text style={styles.hint}>10 dígitos sin espacios ni guiones</Text>
               </View>
 
+              {/* ── 5. Método de Pago ── */}
+              <View style={styles.panel}>
+                <View style={styles.panelHeader}>
+                  <Ionicons name="card" size={18} color={Colors.primary[500]} />
+                  <Text style={styles.panelTitle}>Método de Pago</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: Spacing[3] }}>
+                  <TouchableOpacity
+                    style={[styles.paqueteCard, { flex: 1 }, metodoPago === 'efectivo' && styles.paqueteCardActive]}
+                    onPress={() => setMetodoPago('efectivo')}
+                  >
+                    <Ionicons name="cash-outline" size={24} color={metodoPago === 'efectivo' ? Colors.secondary[600] : Colors.textMuted} />
+                    <View style={{ marginLeft: Spacing[2] }}>
+                      <Text style={[styles.paqueteLabel, metodoPago === 'efectivo' && styles.paqueteLabelActive]}>Efectivo</Text>
+                      <Text style={styles.paqueteDesc}>Pago en ventanilla</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.paqueteCard, { flex: 1 }, metodoPago === 'tarjeta' && styles.paqueteCardActive]}
+                    onPress={() => setMetodoPago('tarjeta')}
+                  >
+                    <Ionicons name="card-outline" size={24} color={metodoPago === 'tarjeta' ? Colors.secondary[600] : Colors.textMuted} />
+                    <View style={{ marginLeft: Spacing[2] }}>
+                      <Text style={[styles.paqueteLabel, metodoPago === 'tarjeta' && styles.paqueteLabelActive]}>Tarjeta</Text>
+                      <Text style={styles.paqueteDesc}>Pago en línea</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
             </View>
 
             {/* ── Right Column / Bottom (Resumen) ── */}
@@ -367,6 +445,66 @@ export default function NuevaReservacion() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Modal de Pago con Tarjeta ── */}
+      <Modal visible={showCardModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Pago con Tarjeta</Text>
+              <TouchableOpacity onPress={() => setShowCardModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: Spacing[4], gap: Spacing[3] }}>
+              <Text style={styles.label}>NÚMERO DE TARJETA</Text>
+              <View style={styles.inputBox}>
+                <Ionicons name="card-outline" size={16} color={Colors.textMuted} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="0000 0000 0000 0000"
+                  keyboardType="numeric"
+                  maxLength={19}
+                  value={cardNumber}
+                  onChangeText={setCardNumber}
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: Spacing[3] }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>VENCIMIENTO</Text>
+                  <View style={styles.inputBox}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="MM/YY"
+                      maxLength={5}
+                      value={cardExpiry}
+                      onChangeText={setCardExpiry}
+                    />
+                  </View>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>CVV</Text>
+                  <View style={styles.inputBox}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="123"
+                      keyboardType="numeric"
+                      secureTextEntry
+                      maxLength={4}
+                      value={cardCvv}
+                      onChangeText={setCardCvv}
+                    />
+                  </View>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.submitBtn} onPress={handlePagarConTarjeta}>
+                <Ionicons name="lock-closed" size={18} color={Colors.white} />
+                <Text style={styles.submitBtnText}>Pagar {formatMXN(totales.total)}</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -688,5 +826,31 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'center',
     lineHeight: 16,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    paddingBottom: Spacing[6],
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing[4],
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.textPrimary,
   },
 });

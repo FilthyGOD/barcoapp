@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppStore } from '@/src/core/store/AppContext';
+import { AuthService } from '@/src/core/services/auth.service';
 import { Colors } from '@/src/core/theme/colors';
 import { FontSize, FontWeight } from '@/src/core/theme/typography';
 import { BorderRadius, Spacing } from '@/src/core/theme/spacing';
@@ -14,8 +15,9 @@ export default function AdminPerfil() {
   const router = useRouter();
 
   const handleLogout = () => {
-    const performLogout = () => {
+    const performLogout = async () => {
       registrarBitacora('LOGOUT', `Cierre de sesión — ${state.user?.name ?? 'Usuario'}`);
+      await AuthService.signOut();
       dispatch({ type: 'LOGOUT' });
       setTimeout(() => router.replace('/login'), 100);
     };

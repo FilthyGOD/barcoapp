@@ -39,6 +39,7 @@ import { Card } from '@/src/shared/components/ui/Card';
 import { Badge } from '@/src/shared/components/ui/Badge';
 import { Modal } from '@/src/shared/components/ui/Modal';
 import { Button } from '@/src/shared/components/ui/Button';
+import { BitacoraSection } from '@/src/shared/components/layout/BitacoraSection';
 import { Colors } from '@/src/core/theme/colors';
 import { FontSize, FontWeight } from '@/src/core/theme/typography';
 import { BorderRadius, Spacing } from '@/src/core/theme/spacing';
@@ -106,6 +107,9 @@ export default function AdminDashboard() {
             sub={`${deHoy.filter(r => r.horaPaseo === '17:30').reduce((s, r) => s + r.numPersonas, 0)} personas`}
           />
         </ScrollView>
+
+        {/* ── Bitácora de Actividad ── */}
+        <BitacoraSection entradas={state.bitacora} />
 
         {/* ── Tendencia mensual ── */}
         <View style={styles.section}>
