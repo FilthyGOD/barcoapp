@@ -138,6 +138,7 @@ interface AppContextValue {
     descripcion: string,
     meta?: Record<string, unknown>
   ) => void;
+  refreshData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -319,8 +320,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [state.user, dispatch]
   );
 
+  const refreshData = useCallback(async () => {
+    rawDispatch({ type: 'SET_LOADING', payload: true });
+    try {
+      const [sbReservaciones, sbPagos, sbConfig, sbBitacora] = await Promise.all([
+        SupabaseService.getReservaciones(),
+        SupabaseService.getPagos(),
+        SupabaseService.getConfig(),
+        SupabaseService.getBitacora(),
+      ]);
+
+      if (sbReservaciones !== null) {
+        const payload = {
+          reservaciones: sbReservaciones,
+          pagos: sbPagos ?? [],
+          config: sbConfig ?? DEFAULT_CONFIG,
+          bitacora: sbBitacora ?? [],
+          dataSource: 'supabase' as const,
+        };
+
+        await Promise.all([
+          StorageService.setReservaciones(payload.reservaciones),
+          StorageService.setPagos(payload.pagos),
+          StorageService.setConfig(payload.config),
+          StorageService.setBitacora(payload.bitacora),
+        ]);
+
+        rawDispatch({ type: 'HYDRATE', payload });
+      }
+    } catch (e) {
+      console.warn('[AppContext] Error refrescando datos:', e);
+    } finally {
+      rawDispatch({ type: 'SET_LOADING', payload: false });
+    }
+  }, []);
+
   return (
-    <AppContext.Provider value={{ state, dispatch, registrarBitacora }}>
+    <AppContext.Provider value={{ state, dispatch, registrarBitacora, refreshData }}>
       {children}
     </AppContext.Provider>
   );

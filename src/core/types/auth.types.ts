@@ -11,6 +11,7 @@ export interface User {
   role: UserRole;
   telefono?: string;
   avatar?: string;
+  isGuest?: boolean;
 }
 
 export interface AuthState {

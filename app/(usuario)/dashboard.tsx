@@ -64,6 +64,34 @@ export default function UsuarioDashboard() {
     }
   };
 
+  const handleReservacion = () => {
+    if (state.user?.isGuest) {
+      if (Platform.OS === 'web') {
+        if (window.confirm('Necesitas crear una cuenta o iniciar sesión para realizar una reservación. ¿Ir al inicio de sesión?')) {
+          dispatch({ type: 'LOGOUT' });
+          router.replace('/login');
+        }
+      } else {
+        Alert.alert(
+          'Inicia sesión',
+          'Necesitas crear una cuenta o iniciar sesión para realizar una reservación.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+              text: 'Iniciar sesión', 
+              onPress: () => {
+                dispatch({ type: 'LOGOUT' });
+                router.replace('/login');
+              } 
+            },
+          ]
+        );
+      }
+    } else {
+      router.push('/(usuario)/reservaciones/nueva');
+    }
+  };
+
   // const deHoy = useMemo(() => reservacionesDeHoy(state.reservaciones), [state.reservaciones]);
   // const ingresos = useMemo(() => ingresosDeHoy(state.reservaciones), [state.reservaciones]);
   // const recientes = useMemo(
@@ -86,13 +114,13 @@ export default function UsuarioDashboard() {
             imageStyle={styles.heroBgImage}
           >
             <View style={styles.heroOverlay}>
-              <Text style={styles.heroTitle}>Embark on a Legend</Text>
+              <Text style={styles.heroTitle}>Embárcate en una Leyenda</Text>
               <Text style={styles.heroSubtitle}>
-                Master the high seas with Barco Pirata. Choose your voyage and write your own pirate tale under the Puerto Peñasco stars.
+                Domina alta mar con Barco Pirata. Elige tu viaje y escribe tu propia historia pirata bajo las estrellas de Puerto Peñasco.
               </Text>
               <View style={styles.heroBadge}>
                 <Ionicons name="shield-checkmark" size={14} color={Colors.white} />
-                <Text style={styles.heroBadgeText}>SAFE PASSAGE GUARANTEED</Text>
+                <Text style={styles.heroBadgeText}>PASO SEGURO GARANTIZADO</Text>
               </View>
             </View>
           </ImageBackground>
@@ -100,7 +128,7 @@ export default function UsuarioDashboard() {
 
         {/* ── Greeting ── */}
         <View style={styles.greetingWrap}>
-          <Text style={styles.greeting}>Bienvenida, {state.user?.name?.split(' ')[0]} ⚓</Text>
+          <Text style={styles.greeting}>Bienvenido(a), {state.user?.name?.split(' ')[0]} ⚓</Text>
           <Text style={styles.subtitle}>
             {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
           </Text>
@@ -112,52 +140,52 @@ export default function UsuarioDashboard() {
             <View style={styles.typeCard}>
               <View style={styles.typeCardHeader}>
                 <View>
-                  <Text style={styles.typeCardPreTitle}>SOLO TRAVELERS & COUPLES</Text>
+                  <Text style={styles.typeCardPreTitle}>VIAJEROS SOLOS Y PAREJAS</Text>
                   <Text style={styles.typeCardTitle}>Paseos{'\n'}individuales</Text>
                 </View>
                 <Ionicons name="person-outline" size={24} color={Colors.textPrimary} />
               </View>
               <Text style={styles.typeCardDesc}>
-                Perfect for those seeking solitude or a romantic sunset getaway. Join a fellowship of fellow adventurers on our daily scheduled departures.
+                Perfecto para quienes buscan soledad o una escapada romántica al atardecer. Únete a una comunidad de aventureros en nuestras salidas diarias programadas.
               </Text>
               <View style={styles.typeCardFeatures}>
-                <FeatureItem text="Scheduled daily departures" />
-                <FeatureItem text="Full access to ship decks" />
+                <FeatureItem text="Salidas diarias programadas" />
+                <FeatureItem text="Acceso total a las cubiertas" />
               </View>
-              <TouchableOpacity style={styles.typeBtn} onPress={() => router.push('/(usuario)/reservaciones/nueva')}>
-                <Text style={styles.typeBtnText}>BOOK NOW</Text>
+              <TouchableOpacity style={styles.typeBtn} onPress={handleReservacion}>
+                <Text style={styles.typeBtnText}>RESERVAR AHORA</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.typeCard}>
               <View style={styles.popularBadgeWrap}>
-                <Text style={styles.popularBadgeText}>POPULAR CHOICE</Text>
+                <Text style={styles.popularBadgeText}>OPCIÓN POPULAR</Text>
               </View>
               <View style={styles.typeCardHeader}>
                 <View>
-                  <Text style={styles.typeCardPreTitle}>CREWS & CELEBRATIONS</Text>
+                  <Text style={styles.typeCardPreTitle}>TRIPULACIONES Y CELEBRACIONES</Text>
                   <Text style={styles.typeCardTitle}>Paseos grupales</Text>
                 </View>
                 <Ionicons name="people-outline" size={24} color={Colors.textPrimary} />
               </View>
               <Text style={styles.typeCardDesc}>
-                Command the entire vessel for your private crew. Ideal for birthdays, corporate events, or weddings.
+                Comanda todo el barco para tu tripulación privada. Ideal para cumpleaños, eventos corporativos o bodas.
               </Text>
               
               <View style={styles.bountyBox}>
                 <Ionicons name="pricetag-outline" size={16} color={Colors.tertiary[700]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.bountyBoxTitle}>Special Crew Bounty</Text>
-                  <Text style={styles.bountyBoxSub}>10% discount for groups of 15+ members</Text>
+                  <Text style={styles.bountyBoxTitle}>Recompensa Especial</Text>
+                  <Text style={styles.bountyBoxSub}>10% de descuento para grupos de más de 15 personas</Text>
                 </View>
               </View>
 
               <View style={styles.typeCardFeatures}>
-                <FeatureItem text="Custom itinerary options" />
-                <FeatureItem text="Private Captain's service" />
+                <FeatureItem text="Opciones de itinerario personalizado" />
+                <FeatureItem text="Servicio de Capitán Privado" />
               </View>
-              <TouchableOpacity style={styles.typeBtn} onPress={() => router.push('/(usuario)/reservaciones/nueva')}>
-                <Text style={styles.typeBtnText}>BOOK NOW</Text>
+              <TouchableOpacity style={styles.typeBtn} onPress={handleReservacion}>
+                <Text style={styles.typeBtnText}>RESERVAR AHORA</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -185,7 +213,7 @@ export default function UsuarioDashboard() {
                 <FeatureItem text="Tour histórico" />
                 <FeatureItem text="Show pirata" />
               </View>
-              <TouchableOpacity style={styles.pkgBtnOutlined} onPress={() => router.push('/(usuario)/reservaciones/nueva')}>
+              <TouchableOpacity style={styles.pkgBtnOutlined} onPress={handleReservacion}>
                 <Text style={styles.pkgBtnOutlinedText}>SELECCIONAR</Text>
               </TouchableOpacity>
             </TouchableOpacity>
@@ -205,7 +233,7 @@ export default function UsuarioDashboard() {
                 <FeatureItem text="Atardecer" />
                 <FeatureItem text="Cócteles especiales" />
               </View>
-              <TouchableOpacity style={styles.pkgBtnOutlined} onPress={() => router.push('/(usuario)/reservaciones/nueva')}>
+              <TouchableOpacity style={styles.pkgBtnOutlined} onPress={handleReservacion}>
                 <Text style={styles.pkgBtnOutlinedText}>SELECCIONAR</Text>
               </TouchableOpacity>
             </TouchableOpacity>
@@ -225,7 +253,7 @@ export default function UsuarioDashboard() {
                 <FeatureItem text="Barra libre incluida" dark />
                 <FeatureItem text="Asientos VIP" dark />
               </View>
-              <TouchableOpacity style={styles.pkgBtnSolid} onPress={() => router.push('/(usuario)/reservaciones/nueva')}>
+              <TouchableOpacity style={styles.pkgBtnSolid} onPress={handleReservacion}>
                 <Text style={styles.pkgBtnSolidText}>MEJOR OPCIÓN</Text>
               </TouchableOpacity>
             </TouchableOpacity>

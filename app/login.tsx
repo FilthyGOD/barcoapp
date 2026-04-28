@@ -119,6 +119,20 @@ export default function LoginScreen() {
     router.replace(user.role === 'admin' ? '/(admin)/dashboard' : '/(usuario)/dashboard');
   };
 
+  const handleGuestLogin = () => {
+    dispatch({
+      type: 'LOGIN',
+      payload: {
+        id: 'guest',
+        name: 'Invitado',
+        email: '',
+        role: 'usuario',
+        isGuest: true,
+      },
+    });
+    router.replace('/(usuario)/dashboard');
+  };
+
   // ── Common Form Card Content ──────────────────────────────────────
   const formContent = (
     <Animated.View
@@ -208,6 +222,15 @@ export default function LoginScreen() {
         >
           <Ionicons name="person-add" size={18} color={Colors.white} />
           <Text style={styles.registerBtnText}>CREAR CUENTA</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.registerBtn, { marginTop: 12, backgroundColor: 'transparent', borderColor: 'rgba(255, 255, 255, 0.2)' }]}
+          onPress={handleGuestLogin}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="compass-outline" size={18} color={Colors.white} />
+          <Text style={styles.registerBtnText}>EXPLORAR SIN CUENTA</Text>
         </TouchableOpacity>
 
         <Text style={styles.footer}>

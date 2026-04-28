@@ -39,17 +39,18 @@ import { Colors } from '@/src/core/theme/colors';
 import { FontSize, FontWeight } from '@/src/core/theme/typography';
 import { BorderRadius, Spacing } from '@/src/core/theme/spacing';
 
-type TabType = 'pendientes' | 'historial';
+type TabType = 'pendientes' | 'aceptadas' | 'historial';
 
 const PAGE_SIZE = 10;
 
 export default function ReservacionesScreen() {
-  const { state, dispatch, registrarBitacora } = useAppStore();
+  const { state, dispatch, registrarBitacora, refreshData } = useAppStore();
   const router = useRouter();
 
   const [busqueda, setBusqueda] = useState('');
   const [activeTab, setActiveTab] = useState<TabType>('pendientes');
   const [pagina, setPagina] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [pagoModalVisible, setPagoModalVisible] = useState(false);
   const [resParaPago, setResParaPago] = useState<Reservacion | null>(null);
@@ -62,8 +63,10 @@ export default function ReservacionesScreen() {
     return basico.filter(r => {
       if (activeTab === 'pendientes') {
         return r.estado === 'pendiente';
+      } else if (activeTab === 'aceptadas') {
+        return r.estado === 'aceptada';
       } else {
-        return r.estado !== 'pendiente';
+        return r.estado === 'pagado' || r.estado === 'rechazada';
       }
     }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [state.reservaciones, activeTab, busqueda]);
@@ -100,7 +103,7 @@ export default function ReservacionesScreen() {
 
   const handleAceptar = (res: Reservacion) => {
     const doAceptar = () => {
-      dispatch({ type: 'UPDATE_RESERVACION', payload: { ...res, estado: 'pagado' } });
+      dispatch({ type: 'UPDATE_RESERVACION', payload: { ...res, estado: 'aceptada' } });
       registrarBitacora('RESERVACION_ACEPTADA', `Reservación ${res.folio} aceptada`, { folio: res.folio });
     };
 
@@ -183,14 +186,28 @@ export default function ReservacionesScreen() {
           <Text style={styles.title}>Reservaciones</Text>
           <Text style={styles.subtitle}>{filtradas.length} total</Text>
         </View>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => router.push('/(admin)/reservaciones/nueva')}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add" size={20} color={Colors.white} />
-          <Text style={styles.addText}>Nueva</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: Colors.neutral[200] }]}
+            onPress={async () => {
+              setRefreshing(true);
+              await refreshData();
+              setRefreshing(false);
+            }}
+            disabled={refreshing}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="refresh" size={20} color={Colors.textPrimary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => router.push('/(admin)/reservaciones/nueva')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={20} color={Colors.white} />
+            <Text style={styles.addText}>Nueva</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Búsqueda */}
@@ -212,6 +229,15 @@ export default function ReservacionesScreen() {
           >
             <Text style={[styles.tabText, activeTab === 'pendientes' && styles.tabTextActive]}>
               Pendientes
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'aceptadas' && styles.tabBtnActive]}
+            onPress={() => { setActiveTab('aceptadas'); setPagina(1); }}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tabText, activeTab === 'aceptadas' && styles.tabTextActive]}>
+              Aceptadas
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -324,6 +350,18 @@ function ResCard({
             <Badge estado={res.estado} size="sm" />
           </View>
         </View>
+        {res.estado === 'pagado' && (
+          <View style={styles.resActions}>
+            <TouchableOpacity
+              style={styles.btnProcesar}
+              onPress={onVerBoleto || onEdit}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="ticket-outline" size={18} color={Colors.white} />
+              <Text style={styles.btnProcesarText}>Ver Boleto</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </Card>
     );
   }
@@ -372,6 +410,15 @@ function ResCard({
               <Text style={styles.btnProcesarText}>Aceptar</Text>
             </TouchableOpacity>
           </View>
+        ) : res.estado === 'aceptada' ? (
+          <TouchableOpacity
+            style={styles.btnProcesar}
+            onPress={onProcesarPago}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="card-outline" size={18} color={Colors.white} />
+            <Text style={styles.btnProcesarText}>Procesar Pago</Text>
+          </TouchableOpacity>
         ) : res.estado === 'pagado' ? (
           <TouchableOpacity
             style={styles.btnProcesar}
